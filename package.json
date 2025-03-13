@@ -1,0 +1,42 @@
+{
+  "name": "@mements/serve",
+  "version": "1.0.0",
+  "description": "A lightweight, type-safe server framework for Bun with automatic performance tracking.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mements/serve"
+  },
+  "author": {
+    "name": "Mements Team"
+  },
+  "bugs": "https://github.com/mements/serve/issues",
+  "homepage": "https://github.com/mements/serve#readme",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "keywords": [
+    "bun",
+    "server",
+    "framework",
+    "typescript",
+    "performance",
+    "web",
+    "api",
+    "frontend",
+    "ssr",
+    "tailwind"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5",
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "bun-plugin-tailwind": "^0.0.15"
+  }
+}
