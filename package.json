@@ -1,16 +1,16 @@
 {
-  "name": "@mements/serve",
-  "version": "1.1.0",
+  "name": "melinajs",
+  "version": "1.2.0",
   "description": "A lightweight, type-safe server framework for Bun with automatic performance tracking.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mements/serve"
+    "url": "https://github.com/mements/melina.js"
   },
   "author": {
     "name": "Mements Team"
   },
-  "bugs": "https://github.com/mements/serve/issues",
-  "homepage": "https://github.com/mements/serve#readme",
+  "bugs": "https://github.com/mements/melina.js/issues",
+  "homepage": "https://github.com/mements/melina.js#readme",
   "license": "MIT",
   "engines": {
     "bun": ">=1.0.0"

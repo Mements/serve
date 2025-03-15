@@ -47,7 +47,6 @@ export async function measure<T>(
   let logPrefix = requestId ? `[${requestId}] ${indent}>` : `${indent}>`;
 
   try {
-
     indent = ">".repeat(level);
     logPrefix = requestId ? `[${requestId}] ${indent}$` : `${indent}$`;
     console.log(`${logPrefix} ${action}...`);
@@ -99,7 +98,6 @@ type EntrypointConfig = {
   path: string;
   serverData?: (ctx: MiddlewareContext & { requestId: string; measure: MeasureFn }) => Promise<any>;
 };
-
 
 const filePathCache: Record<string, string> = {};
 
@@ -163,8 +161,6 @@ export async function serve(config: ServeOptions) {
   const routeMap: RouteMapping = {};
   const entrypoints: Record<string, EntrypointConfig> = {};
   const pageHandlers: Record<string, (req: Request) => Promise<any>> = {};
-
-
 
   await measure(async (measure) => {
     for (const page of config.pages) {
@@ -244,7 +240,7 @@ export async function serve(config: ServeOptions) {
     external: Object.keys(importMap.imports),
     define: {
       "process.env.NODE_ENV": JSON.stringify(isDev ? "development" : "production"),
-      "process.env.HOST": isDev ? `http://localhost:${serverPort}` : "https://mements.ai",
+      "process.env.HOST": process.env.HOST || (isDev ? `http://localhost:${serverPort}` : ""),
     },
     naming: {
       chunk: "[name].[hash].[ext]",
@@ -268,7 +264,6 @@ export async function serve(config: ServeOptions) {
         async (measure) => {
           try {
             const result = await build({ ...buildConfig, entrypoints: [entrypoint.path] });
-
 
             if (result && result.outputs) {
               for (const output of result.outputs) {
@@ -444,30 +439,31 @@ if (require.main === module) {
   serve(exampleConfig);
 }
 
-export function generateImports(packageJson: any) {
+export function generateImports(packageJson: any, options: { exclude?: string[] } = {}) {
   const dependencies = {
     ...packageJson.dependencies || {},
     ...packageJson.devDependencies || {}
   };
 
-  const knownDependencies: Record<string, string[]> = {
-    "sonner": ["react", "react-dom"],
-    "wouter": ["react"],
-    "framer-motion": ["react"],
-  };
+  // Default exclusions plus any user-provided ones
+  const defaultExclusions = ["@types/", "typescript", "melinajs", "bun"];
+  const exclusions = [...defaultExclusions, ...(options.exclude || [])];
+  
+  // Map of known packages that require specific dependencies
+  const knownDependencyMap: Record<string, string[]> = {};
 
   const imports = Object.entries(dependencies)
     .filter(([name]) => {
-      const backendDependencies = ["@types/", "typescript", "@mements/serve", "zod"];
-      return !backendDependencies.some(dep => name.startsWith(dep));
+      return !exclusions.some(pattern => name.startsWith(pattern) || name === pattern);
     })
     .map(([name, version]) => {
-      if (name === "react-dom") {
+      if (name === "react-dom" && packageJson.dependencies?.react) {
+        const reactVersion = packageJson.dependencies.react.replace(/^\^/, '');
         return [
           { name, version: (version as string).replace(/^\^/, '') },
           { name: "react-dom/client", version: (version as string).replace(/^\^/, ''), deps: [] },
-          { name: "react/jsx-dev-runtime", version: packageJson.dependencies.react.replace(/^\^/, ''), deps: [] },
-          { name: "react/jsx-runtime", version: packageJson.dependencies.react.replace(/^\^/, ''), deps: [] }
+          { name: "react/jsx-dev-runtime", version: reactVersion, deps: [] },
+          { name: "react/jsx-runtime", version: reactVersion, deps: [] }
         ];
       }
 
@@ -479,11 +475,18 @@ export function generateImports(packageJson: any) {
         };
       }
 
-      if (knownDependencies[name]) {
-        return { name, version: (version as string).replace(/^\^/, ''), deps: knownDependencies[name] };
+      if (knownDependencyMap[name]) {
+        return { 
+          name, 
+          version: (version as string).replace(/^\^/, ''), 
+          deps: knownDependencyMap[name] 
+        };
       }
 
-      return { name };
+      return { 
+        name,
+        version: (version as string).replace(/^\^/, '')
+      };
     })
     .flat();
 

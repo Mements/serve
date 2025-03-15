@@ -1,4 +1,4 @@
-# @mements/serve
+# melina.js
 
 A lightweight, type-safe server framework for Bun with automatic performance tracking.
 
@@ -16,13 +16,13 @@ A lightweight, type-safe server framework for Bun with automatic performance tra
 ## Installation
 
 ```bash
-npm install @mements/serve
+npm install melinajs
 ```
 
 or 
 
 ```bash
-yarn add @mements/serve
+yarn add melinajs
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ yarn add @mements/serve
 Create a complete app with server-rendered pages and type-safe API:
 
 ```ts
-import { serve } from "@mements/serve";
+import { serve } from "melinajs";
 
 // Create a user dashboard application
 serve({
@@ -206,7 +206,7 @@ serve({
 });
 
 // Or use automatic package.json analysis
-import { serve, generateImports } from "@mements/serve";
+import { serve, generateImports } from "melinajs";
 import packageJson from "./package.json";
 
 serve({
