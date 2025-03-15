@@ -5,10 +5,13 @@ A lightweight, type-safe server framework for Bun with automatic performance tra
 ## Features
 
 - **Type-Safe API Routes**: Build endpoints with complete type safety
+- **API Endpoint Typing**: Define and enforce request/response contracts
 - **Server-Side Data Injection**: Add dynamic data to your pages
 - **Import Management**: Handle frontend dependencies automatically
-- **Performance Tracking**: Built-in performance monitoring
+- **Performance Tracking**: Built-in nested performance monitoring with request IDs
 - **Development Ready**: Fast hot reloading for quick iterations
+- **Static Assets**: Serve static files from a dedicated assets directory
+- **Dependency Analysis**: Automatic package.json parsing and import generation
 
 ## Installation
 
@@ -87,6 +90,38 @@ serve({
 
 ## Core Concepts
 
+### Type-Safe API Endpoints
+
+Define concrete API endpoint types with strict typing:
+
+```ts
+// Define API endpoint types
+export type ApiEndpoint = {
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+    path: string;
+    body?: any;
+    query?: Record<string, string | number | boolean>;
+    response: any;
+};
+
+// Create specific endpoints
+export type GetHealthEndpoint = {
+    method: 'GET';
+    path: '/api/health';
+    query?: undefined;
+    response: { status: string };
+};
+
+// Server implementation with full type-checking
+const api = {
+  '/api/health': async (req: Request): Promise<Response> => {
+    return new Response(JSON.stringify({ status: 'ok' }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+};
+```
+
 ### Server-Side Data Injection
 
 Your pages automatically receive data from server handlers:
@@ -122,75 +157,62 @@ function Dashboard() {
 }
 ```
 
-### Type-Safe API Routes
+### Performance Tracking
 
-Define fully typed API endpoints for frontend consumption:
+Every operation is automatically timed and logged with unique request IDs and visual indicators:
 
 ```ts
-// api-types.ts - shared between frontend and backend
-export type GetStatsEndpoint = {
-  method: 'GET';
-  path: '/api/stats';
-  query: { 
-    period: 'day' | 'week' | 'month'; 
-    userId?: string;
-  };
-  response: { 
-    visitors: number;
-    pageViews: number;
-    conversions: number;
-    conversionRate: number;
-  };
-};
-
-// Frontend: generate type-safe fetch functions
-async function fetchStats(
-  period: GetStatsEndpoint['query']['period'], 
-  userId?: string
-): Promise<GetStatsEndpoint['response']> {
-  const params = new URLSearchParams({ period });
-  if (userId) params.append('userId', userId);
-  
-  const res = await fetch(`/api/stats?${params}`);
-  return await res.json();
-}
-
-// Backend: implement with full type checking
-const api = {
-  '/api/stats': async (req) => {
-    const url = new URL(req.url);
-    const period = url.searchParams.get('period') as GetStatsEndpoint['query']['period'];
-    const userId = url.searchParams.get('userId') || undefined;
+// Nested performance tracking included automatically
+const result = await measure(
+  async (measure) => {
+    // Run some expensive operation
+    const data = await fetchData();
     
-    const stats = await getStats(period, userId);
-    
-    return new Response(JSON.stringify(stats), {
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-};
+    // Measure nested operations with context
+    return await measure(
+      async () => processData(data),
+      "Process fetched data" 
+    );
+  },
+  "Fetch and process data",
+  { requestId }
+);
+
+// Console output:
+// [abc123] >$ Fetch and process data...
+// [abc123] >>$ Process fetched data...
+// [abc123] <<$ Process fetched data ✓ 45.32ms
+// [abc123] <$ Fetch and process data ✓ 134.56ms
 ```
+
+The framework automatically:
+1. Generates unique request IDs
+2. Tracks nested operations with visual indicators for start/end
+3. Measures and logs execution time with success/failure states
+4. Maintains context across async operations
 
 ### Import Management
 
-Never worry about managing frontend dependencies - just declare what you need:
+Never worry about managing frontend dependencies - just declare what you need or let the framework analyze your package.json:
 
 ```ts
+// Manual imports definition
 serve({
-  // All dependencies are automatically resolved via ESM.sh
   imports: [
-    // Core libraries
     { name: 'react', version: '18.2.0' },
     { name: 'react-dom/client', version: '18.2.0' },
-    
-    // UI components with dependencies
     { name: '@mui/material', version: '5.11.0', deps: ['react'] },
-    { name: '@tanstack/react-query', version: '4.20.4', deps: ['react'] },
-    
-    // Individual modules
-    { name: 'lodash/debounce' },
-    { name: 'date-fns/format' }
   ],
+});
+
+// Or use automatic package.json analysis
+import { serve, generateImports } from "@mements/serve";
+import packageJson from "./package.json";
+
+serve({
+  // Automatically analyze dependencies
+  imports: generateImports(packageJson),
+  // ...rest of config
 });
 ```
 
@@ -199,6 +221,23 @@ The framework automatically:
 2. Resolves all dependencies through ESM.sh
 3. Injects it into your HTML
 4. Supports development mode with proper sourcemaps
+5. Handles special cases like React JSX runtime
+
+## Static Assets
+
+Place your static files in the `./assets` directory and they'll be served automatically:
+
+```
+myapp/
+├── assets/           # Static assets served directly
+│   ├── favicon.ico
+│   ├── images/
+│   ├── fonts/
+│   └── ...
+├── pages/            # Dynamic pages with server handlers
+├── dist/             # Build output (created automatically)
+└── ...
+```
 
 ## Handler Context
 
@@ -209,6 +248,15 @@ async function dashboardHandler(ctx) {
   // Access request data
   const { userId } = ctx.query;
   const { token } = ctx.headers;
+  
+  // Unique request ID for tracing
+  console.log(`Request ID: ${ctx.requestId}`);
+  
+  // Performance tracking
+  const userData = await ctx.measure(
+    async () => fetchUserData(userId),
+    "Fetch user data"
+  );
   
   if (ctx.method === 'POST') {
     // Handle form submissions with parsed body
@@ -225,7 +273,7 @@ async function dashboardHandler(ctx) {
   
   // Return data to inject into the page
   return {
-    user: await getUserData(userId),
+    user: userData,
     isAdmin: await checkPermissions(userId, 'admin')
   };
 }
@@ -237,28 +285,35 @@ async function dashboardHandler(ctx) {
 graph TD
     A[Browser Request] --> B[Bun Server]
     B --> C{Route Type}
-    C -->|Static Asset| D[Serve from dist/]
-    C -->|Page Route| E[Execute Page Handler]
-    C -->|API Endpoint| F[Execute API Handler]
+    C -->|Static Asset| D[Serve from assets/]
+    C -->|Built File| E[Serve from dist/]
+    C -->|Page Route| F[Execute Page Handler]
+    C -->|API Endpoint| G[Execute API Handler]
     
-    E --> G[Get Dynamic Data]
-    G --> H[Build/Rebuild Page]
-    H --> I[Inject Data via HTMLRewriter]
-    I --> J[Add Import Map]
+    F --> H[Get Dynamic Data]
+    H --> I[Build/Rebuild Page]
+    I --> J[Cache File Path]
+    J --> K[Inject Data via HTMLRewriter]
+    K --> L[Add Import Map]
     
-    F --> K[Process API Request]
-    K --> L[Return JSON Response]
+    G --> M[Process API Request]
+    M --> N[Return JSON Response]
     
-    D --> M[Response to Browser]
-    J --> M
-    L --> M
+    D --> O[Response to Browser]
+    E --> O
+    L --> O
+    N --> O
 ```
 
 ## Development Features
 
 - **Hot Reloading**: Pages rebuild on each request in development mode
-- **Performance Monitoring**: Every operation is automatically timed
-- **Request IDs**: Trace requests through your logs with unique IDs
+- **Request Tracing**: Unique IDs for tracking requests through logs
+- **Visual Performance Monitoring**: Operations tracked with visual indicators
+- **File Path Caching**: Improved performance for built files
+- **Static Assets Support**: Dedicated directory for static files
+- **Package Analysis**: Automatic import generation from package.json
+- **Error Handling**: Detailed stack traces during development
 - **Type Safety**: Full TypeScript support throughout your codebase
 
 ## License
